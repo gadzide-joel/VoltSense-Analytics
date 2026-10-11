@@ -15,60 +15,35 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# --- AJOUT DU CORS POUR LE DASHBOARD ---
+# Configuration CORS pour autoriser le dashboard web
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Autorise n'importe quelle page web à se connecter
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ---------------------------------------
 
 @app.get("/")
+def read_root():
+    return {"message": "Bienvenue sur l'API VoltSense Analytics"}
 
-def root():
-    return {
-        "system": "VoltSense Analytics",
-        "status": "online",
-        "message": "Bienvenue sur l'API de surveillance industrielle"
-    }
-
-# Endpoint pour recevoir les données envoyées par les boîtiers ESP32
 @app.post("/api/v1/telemetry", response_model=schemas.TelemetryResponse)
-def receive_telemetry(data: schemas.TelemetryCreate, db: Session = Depends(get_db)):
+def create_telemetry(telemetry: schemas.TelemetryCreate, db: Session = Depends(get_db)):
     db_telemetry = models.Telemetry(
-        device_id=data.device_id,
-        voltage=data.voltage,
-        current=data.current,
-        power=data.power,
-        frequency=data.frequency
+        device_id=telemetry.device_id,
+        voltage=telemetry.voltage,
+        current=telemetry.current,
+        power=telemetry.power,
+        frequency=telemetry.frequency,
+        temperature=telemetry.temperature
     )
     db.add(db_telemetry)
-    
-    # Détection automatique d'anomalie de tension (ex: réseau togolais / CEET)
-    if data.voltage > 245.0:
-        alert = models.Alert(
-            device_id=data.device_id,
-            alert_type="Surtension",
-            severity="CRITICAL",
-            message=f"Tension anormale détectée : {data.voltage}V"
-        )
-        db.add(alert)
-    elif data.voltage < 195.0:
-        alert = models.Alert(
-            device_id=data.device_id,
-            alert_type="Baisse de tension",
-            severity="WARNING",
-            message=f"Chute de tension détectée : {data.voltage}V"
-        )
-        db.add(alert)
-
     db.commit()
     db.refresh(db_telemetry)
     return db_telemetry
 
-# Endpoint pour récupérer l'historique des relevés
 @app.get("/api/v1/telemetry", response_model=List[schemas.TelemetryResponse])
-def get_telemetry_history(limit: int = 50, db: Session = Depends(get_db)):
-    return db.query(models.Telemetry).order_by(models.Telemetry.timestamp.desc()).limit(limit).all()
+def get_telemetries(limit: int = 20, db: Session = Depends(get_db)):
+    records = db.query(models.Telemetry).order_by(models.Telemetry.id.desc()).limit(limit).all()
+    return records
