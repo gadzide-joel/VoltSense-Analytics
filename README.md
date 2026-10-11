@@ -11,6 +11,7 @@
 
 ## 🏗️ Architecture Technique
 
+```text
 VoltSense-Analytics/
 ├── backend/                  # API FastAPI & Modèles de données SQLAlchemy
 │   ├── database.py           # Configuration de la connexion PostgreSQL
@@ -24,6 +25,8 @@ VoltSense-Analytics/
 ├── dashboard.html            # Interface web de supervision
 ├── .gitignore                # Fichiers ignorés par Git
 └── README.md                 # Documentation du projet
+```
+
 
 
 ---
