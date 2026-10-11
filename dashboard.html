@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>VoltSense Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; text-align: center; }
+        .container { background: white; width: 90%; margin: auto; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        
+        /* Styles pour les alertes */
+        .alert { padding: 15px; margin: 20px 0; border-radius: 8px; font-weight: bold; font-size: 1.2em; }
+        .alert-ok { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; }
+        .alert-warning { background-color: #fff3e0; color: #ef6c00; border: 1px solid #ef6c00; }
+        .alert-critical { background-color: #ffebee; color: #c62828; border: 1px solid #c62828; }
+        
+        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 30px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>⚡ Tableau de Bord - VoltSense Analytics</h1>
+        
+        <!-- Bandeau d'alerte -->
+        <div id="alertBox" class="alert alert-ok">En attente des données...</div>
+        
+        <!-- Zone des graphiques -->
+        <div class="charts-grid">
+            <canvas id="voltageChart" height="60"></canvas>
+            <canvas id="currentChart" height="60"></canvas>
+            <canvas id="powerChart" height="60"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour créer un graphique facilement
+        function createChart(ctxId, label, color, bgColor) {
+            return new Chart(document.getElementById(ctxId).getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: label, borderColor: color, backgroundColor: bgColor, borderWidth: 2, data: [], fill: true, tension: 0.3 }] },
+                options: { animation: false }
+            });
+        }
+
+        const voltageChart = createChart('voltageChart', 'Tension (Volts)', '#2196F3', 'rgba(33, 150, 243, 0.2)');
+        const currentChart = createChart('currentChart', 'Courant (Ampères)', '#FF9800', 'rgba(255, 152, 0, 0.2)');
+        const powerChart = createChart('powerChart', 'Puissance (Watts)', '#4CAF50', 'rgba(76, 175, 80, 0.2)');
+
+        async function fetchDonnees() {
+            try {
+                const reponse = await fetch('http://127.0.0.1:8000/api/v1/telemetry?limit=20');
+                const donnees = await reponse.json();
+                donnees.reverse();
+
+                const labels = donnees.map(d => new Date(d.timestamp).toLocaleTimeString());
+                
+                // Mise à jour des graphiques
+                voltageChart.data.labels = labels;
+                voltageChart.data.datasets[0].data = donnees.map(d => d.voltage);
+                voltageChart.update();
+
+                currentChart.data.labels = labels;
+                currentChart.data.datasets[0].data = donnees.map(d => d.current);
+                currentChart.update();
+
+                powerChart.data.labels = labels;
+                powerChart.data.datasets[0].data = donnees.map(d => d.power);
+                powerChart.update();
+
+                // Gestion des alertes avec la dernière valeur reçue
+                const latestVoltage = donnees[donnees.length - 1].voltage;
+                const alertBox = document.getElementById('alertBox');
+                
+                if (latestVoltage > 245.0) {
+                    alertBox.className = 'alert alert-critical';
+                    alertBox.innerHTML = `⚠️ ALERTE CRITIQUE : Surtension détectée (${latestVoltage}V)`;
+                } else if (latestVoltage < 195.0) {
+                    alertBox.className = 'alert alert-warning';
+                    alertBox.innerHTML = `⚠️ AVERTISSEMENT : Chute de tension (${latestVoltage}V)`;
+                } else {
+                    alertBox.className = 'alert alert-ok';
+                    alertBox.innerHTML = `✅ Réseau stable (${latestVoltage}V)`;
+                }
+
+            } catch (erreur) {
+                console.error("Erreur API :", erreur);
+            }
+        }
+
+        setInterval(fetchDonnees, 5000);
+        fetchDonnees();
+    </script>
+
+</body>
+</html>
